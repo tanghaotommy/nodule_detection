@@ -6,16 +6,16 @@ set -e
 k_fold=4
 
 #The detector you want to use
-detector=res18
+detector=combnet
 
 #How many epochs you want to train the model
-epochs=200
+epochs=150
 
 #How frequent do you want to save the epoch
 save_freq=5
 
 #What is the batch size
-batch_size=16
+batch_size=1
 
 #Initial learning rate, decay 0.1 every 50% and 80% of epochs
 lr=0.01
@@ -32,7 +32,7 @@ python split.py --k-fold $k_fold
 for((i=${start_fold};i<${k_fold};i++))
 do
 	#Train the detector
-	cmd="python main.py --optim adam --model $detector --save-dir $i --train-filename ./split/train_${i}.npy --val-filename ./split/val_${i}.npy --lr $lr --workers 16 -b $batch_size --epochs $epochs --save-freq 5"
+	cmd="python main_combnet.py --model $detector --save-dir $i --train-filename ./split/train_${i}.npy --val-filename ./split/val_${i}.npy --lr $lr --workers 1 -b $batch_size --epochs $epochs --save-freq 5"
 	echo "$cmd"
 	echo "Training $i folder ..."
 	$cmd
@@ -44,9 +44,9 @@ do
 	fi
 	
 	#Test the detector on validation
-	for((j=100;j<=${epochs};j+=5))
+	for((j=50;j<=100;j+=5))
 	do
-		cmd="python main.py --model $detector --resume results/${i}/${j}.ckpt --workers 1 --test-filename ./split/val_${i}.npy --test 1 --save-dir val/${i}/${j}"
+		cmd="python main.py --model $detector --resume results/${i}/`printf "%03d" $j`.ckpt --workers 1 --test-filename ./split/val_${i}.npy --test 1 --save-dir val/${i}/${j}"
 		echo "$cmd"
 		echo "Predicting $i folder ..."
 		$cmd
