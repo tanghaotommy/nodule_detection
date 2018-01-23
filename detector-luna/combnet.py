@@ -116,8 +116,9 @@ class Net(nn.Module):
     def forward(self, x, x2, coord):
         out_global_net = self.global_net(x2)
         size_global_net = out_global_net.size()
-        out_global_net = out_global_net.unsqueeze(-1).expand(size_global_net[0], size_global_net[1], (config['crop_size'] / 4)**3).transpose(2,1).contiguous().view(size_global_net[0], config['crop_size'] / 4, config['crop_size'] / 4, config['crop_size'] / 4, size_global_net[1])
-        
+        out_global_net = out_global_net.unsqueeze(-1).expand(size_global_net[0], size_global_net[1], (x.size()[2] / 4)**3).contiguous().view(size_global_net[0], size_global_net[1], x.size()[2] / 4, x.size()[3] / 4, x.size()[4] / 4)
+
+
         out = self.preBlock(x)#16
         out_pool,indices0 = self.maxpool1(out)
         out1 = self.forw1(out_pool)#32
@@ -135,8 +136,10 @@ class Net(nn.Module):
         #comb3 = self.drop(comb3)
         rev2 = self.path2(comb3)
 
-        comb2 = self.back2(torch.cat((rev2, out2,coord, out_global_net), 1))#64+64+128
+        comb2 = self.back2(torch.cat((rev2, out2,coord), 1))#64+64+128
         comb2 = self.drop(comb2)
+
+        comb2 = torch.cat((comb2, out_global_net), 1)
         out = self.output(comb2)
         size = out.size()
         out = out.view(out.size(0), out.size(1), -1)
@@ -160,6 +163,8 @@ class GlobalNet(nn.Module):
 
         in_num = (config['crop_size_global'][0] / 2**4)**3*128
         self.fc1 = nn.Linear(in_num, 128)
+        self.dropout = nn.Dropout(0.5)
+        self.Relu = nn.ReLU()
 
     def forward(self, x):
         out1 = self.block1(x)
@@ -171,7 +176,9 @@ class GlobalNet(nn.Module):
         out4 = self.block4(out3_pool)
         out4_pool, _ = self.maxpool4(out4)
 
-        out = self.fc1(out4_pool)
+        features = out4_pool.view(x.size(0), -1)
+
+        out = self.Relu(self.fc1(self.dropout(features)))
         return out
 
 

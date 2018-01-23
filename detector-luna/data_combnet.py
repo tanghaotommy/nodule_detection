@@ -99,16 +99,17 @@ class DataBowl3Detector(Dataset):
                 bboxes = self.sample_bboxes[randimid]
                 isScale = self.augtype['scale'] and (self.phase=='train')
                 sample, target, bboxes, coord = self.crop(imgs, [], bboxes,isScale=False,isRand=True)
-            if sample.shape[1] != 128 or sample.shape[2] != 128 or sample.shape[3] != 128:
-                print filename, sample.shape
+		if sample.shape[1] != self.config['crop_size'][0] or sample.shape[2] != self.config['crop_size'][1] or sample.shape[3] != self.config['crop_size'][2]:
+			print filename, sample.shape
             label = self.label_mapping(sample.shape[1:], target, bboxes)
             sample = (sample.astype(np.float32)-128)/128
             #if filename in self.kagglenames and self.phase=='train':
             #    label[label==-1]=0
-            return torch.from_numpy(sample), torch.from_numpy(scale(copy.deepcopy(imgs), self.config)), torch.from_numpy(label), coord
+            return torch.from_numpy(sample), torch.from_numpy((scale(copy.deepcopy(imgs), self.config).astype(np.float32) - 128) / 128), torch.from_numpy(label), coord
         else:
             imgs = np.load(self.filenames[idx])
             imgs = imgs[np.newaxis,...]
+            imgs_global_net = copy.deepcopy(imgs)
             bboxes = self.sample_bboxes[idx]
             nz, nh, nw = imgs.shape[1:]
             pz = int(np.ceil(float(nz) / self.stride)) * self.stride
@@ -128,7 +129,7 @@ class DataBowl3Detector(Dataset):
             assert np.all(nzhw==nzhw2)
             imgs = (imgs.astype(np.float32)-128)/128
             #print imgs.shape
-            return torch.from_numpy(imgs), torch.from_numpy(scale(copy.deepcopy(imgs), self.config)), bboxes, torch.from_numpy(coord2), np.array(nzhw)
+            return torch.from_numpy(imgs), torch.from_numpy((scale(imgs_global_net, self.config).astype(np.float32) - 128) / 128), bboxes, torch.from_numpy(coord2), np.array(nzhw)
 
     def __len__(self):
         if self.phase == 'train':
@@ -259,9 +260,8 @@ class Crop(object):
 
 def scale(crop, config):
     crop_size = config['crop_size_global']
-    scale = [1, crop.shape[1] / float(crop_size[0]), crop.shape[2] / float(crop_size[1]), crop.shape[3] / float(crop_size[2])]
-    
-    print 'From ', crop.shape, ' to ', crop_size 
+    scale = [1, float(crop_size[0]) / crop.shape[1], float(crop_size[1]) / crop.shape[2] , float(crop_size[2]) / crop.shape[3]]
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         crop = zoom(crop, scale, order=0)
@@ -271,7 +271,6 @@ def scale(crop, config):
     elif newpad>0:
         pad2 = [[0,0],[0,newpad],[0,newpad],[0,newpad]]
         crop = np.pad(crop,pad2,'constant',constant_values =170)
-    print 'Finished cropping'
     return crop
 
 class LabelMapping(object):

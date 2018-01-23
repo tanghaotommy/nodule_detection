@@ -2,3 +2,4 @@
 **/exampleFiles
 **/original
 **/original-best-epoch
+*.pyc
